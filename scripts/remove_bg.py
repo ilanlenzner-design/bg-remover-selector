@@ -39,27 +39,26 @@ def run_model(model_id, image_path, output_path, token):
     import replicate
 
     os.environ["REPLICATE_API_TOKEN"] = token
+    client = replicate.Client(api_token=token)
 
-    # Determine input format based on model
     print(f"Running {model_id} on {image_path}...")
 
-    with open(image_path, "rb") as f:
-        image_data = f
+    # Get the latest version of the model
+    model = client.models.get(model_id)
+    version = model.latest_version
 
-        # Different models accept different input schemas
-        if model_id == "851-labs/background-remover":
-            output = replicate.run(model_id, input={"image": f})
-        elif model_id == "lucataco/remove-bg":
-            output = replicate.run(model_id, input={"image": f})
-        elif model_id == "bria/remove-background":
-            output = replicate.run(model_id, input={"image": f})
-        elif model_id == "men1scus/birefnet":
-            output = replicate.run(model_id, input={"image": f})
-        elif model_id == "cjwbw/rembg":
-            output = replicate.run(model_id, input={"image": f})
-        else:
-            print(f"Unknown model: {model_id}", file=sys.stderr)
+    with open(image_path, "rb") as f:
+        output = client.predictions.create(
+            version=version,
+            input={"image": f}
+        )
+        output.wait()
+
+        if output.status == "failed":
+            print(f"ERROR: Prediction failed: {output.error}", file=sys.stderr)
             sys.exit(1)
+
+        output = output.output
 
     # Handle output - could be a URL string or a FileOutput object
     result_url = None
